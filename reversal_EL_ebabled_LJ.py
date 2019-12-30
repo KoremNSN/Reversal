@@ -7,7 +7,7 @@ Nachshon Korem, Yale
 
 """
 ### import packages
-import datetime, os, random
+import datetime, os, random, time
 from psychopy import visual, core, monitors, event #, data, tools
 from psychopy.hardware.labjacks import U3
 import pylink as pl
@@ -31,7 +31,7 @@ class subject:
         self.dataFile = open(fileName+'.csv', 'w')
         
         #writes headers for the output file
-        self.dataFile.write('Sub,Group,time,Trial_n,Condition,color,US,FixationOnset,StimulusOnset,USOnset\n')
+        self.dataFile.write('Sub,Group,time,Trial_n,Condition,color,US,FixationOnset,StimulusOnset,USOnset,reversal\n')
 
 
 # %% create an experemental object input is a subject object
@@ -43,11 +43,10 @@ class exp:
         #initiate a trial counter
         self.trial_n = 0
         self.lj = U3()
-        self.lj.setFIOState(3,0)
+        self.lj.setFIOState(6,1)
         self.lj.setFIOState(0,0)
+        self.reversed=False
 
-        
-                    
         # creates the visual objects for the experiment
         self.fixation=visual.Circle(self.win, radius=10, fillColor='black',lineColor='black',units = 'pix')
         self.rect = visual.Rect(self.win,units="norm",width=0.5,height=0.5,fillColor='black',lineColor='Grey',pos=(0,0))
@@ -72,29 +71,25 @@ class exp:
         '''Thank you very much
         
         '''
+        # call for eyelink
+        self.eyelink_tracker = pl.EyeLink("100.1.1.1")
+        
         #parameters for eyelink
         self.monitor = monitors.Monitor('testMonitor')
         self.winSize = self.monitor.getSizePix()
         self.foreground = (250,250,250)
         self.background = (127,127,127)
         
-        # call for eyelink
-        self.eyelink_tracker = pl.EyeLink("100.1.1.1")
-        
+        # create file
         self.edfFileName = "cbEL" + str(sub.subjectID)
         if len(self.edfFileName) > 8:
             self.edfFileName = self.edfFileName[0:8]
         pl.getEYELINK().openDataFile(self.edfFileName)
-        
-
-        pl.flushGetkeyQueue()
         pl.getEYELINK().setOfflineMode()
-        
     
         #Eyelink - Gets the display surface and sends a mesage to EDF file;
         pl.getEYELINK().sendCommand("screen_pixel_coords =  0 0 %d %d"%(self.winSize[0]-1, self.winSize[1]-1))
         pl.getEYELINK().sendMessage("Resolution %d %d" %((self.winSize[0]-1, self.winSize[1]-1)))
-        
         pl.getEYELINK().sendMessage("EyeToScreen %d" %(self.monitor.getDistance()))
         pl.getEYELINK().sendMessage("MonitorWidth %d" %(self.monitor.getWidth()))
     
@@ -107,82 +102,62 @@ class exp:
         pl.getEYELINK().sendCommand("link_event_filter = LEFT,RIGHT,FIXATION,SACCADE,BLINK,BUTTON,INPUT")
     
         #EyeLink - Set Calibration Environment
-        #getEYELINK().sendCommand("button_function 5 'accept_target_fixation'");
-        pl.setCalibrationColors(self.foreground, self.background);  	#Sets the calibration target and background color  - background color should match testing background
-        #setTargetSize(int(win.size[0]/20), int(win.size[0]/100));	#select best size for calibration target
+        pl.setCalibrationColors(self.foreground, self.background);  	#Sets the calibration target and background color  - background color should match testing background        
         
-        
-        #self.Text.text = "calibration press 7"
-        #self.Text.draw()
-        #self.win.flip()
-        #while True: 
-        #    buttonPress=event.waitKeys(keyList = ['7']) 
-        #    if buttonPress == ['5']:
-        #        break
-        
+        pl.flushGetkeyQueue()
         pl.getEYELINK().setOfflineMode()
         winX = int(self.winSize[0])
         winY = int(self.winSize[1])
         pl.openGraphics((winX,winY),32)
         pl.getEYELINK().doTrackerSetup()
+        pl.closeGraphics()
         pl.setCalibrationSounds("", "", "");
         pl.setDriftCorrectSounds("", "off", "off");
-        pl.closeGraphics()
 # %%
     def init_eyelink(self):
         
         event.clearEvents()
         self.Text.text = 'Experiment start'
         self.Text.draw()
-            # # # # # # # # # # # # # # # # # # 
         pl.getEYELINK().sendMessage('WaitForExptrStart')
-            # # # # # # # # # # # # # # # # # # 
         self.win.flip()
         
-        
+        pl.getEYELINK().sendMessage('WaitForExptrStart press 7')
         while True:
             buttonPress=event.getKeys(keyList = ['7'])
-            pl.getEYELINK().sendMessage('WaitForExptrStart press 7')
             if buttonPress==['7']:
                 break
         
         event.clearEvents()
         self.Text.text = 'Waiting for the scanner to start...'
         self.Text.draw()
-            # # # # # # # # # # # # # # # # # # 
         pl.getEYELINK().sendMessage('WaitForExptrStart')
-            # # # # # # # # # # # # # # # # # # 
         self.win.flip()
         
+        pl.getEYELINK().sendMessage('WaitForScanner')
         while True:
-            pl.getEYELINK().sendMessage('WaitForScanner')
             buttonPress=event.getKeys(keyList = ['5'])
-            
             if buttonPress == ['5']:
                 break
-        
+        #get a start point  
+        self.globTime = core.Clock()
         self.Text.text = "Ready"
         self.Text.draw()
         self.win.flip()
-        current = datetime.datetime.now()
-        while (datetime.datetime.now()-current).seconds < 5:
-            pl.getEYELINK().sendMessage('ReadyScreen')
+        pl.getEYELINK().sendMessage('ReadyScreen')
+        time.sleep(5)            
+            
             
         self.fixation.draw()
         self.win.flip()
-        current = datetime.datetime.now()
-        while (datetime.datetime.now()-current).seconds < 2:
-            pl.getEYELINK().sendMessage('ReadyITI')
-        
+        pl.getEYELINK().sendMessage('ReadyITI')
+        time.sleep(2)
         event.clearEvents()
 
 # %% run the experiment        
     def seq_order(self):
    
-        #get a start point  
-        self.globTime = core.Clock()
-        # group A order based on the e-prime
-        if self.group == "A":
+        if self.group == "A": # group A order based on the e-prime
             self.trial(self.stim["CSplus"], True)
             self.trial(self.stim["CSminus"])
             self.trial(self.stim["CSplus"])
@@ -213,6 +188,7 @@ class exp:
             self.trial(self.stim["CSplus"])
             self.trial(self.stim["CSplus"])
             self.trial(self.stim["CSminus"])
+            self.reversed=True
             self.trial(self.stim["CSminus"], True)
             self.trial(self.stim["CSplus"])
             self.trial(self.stim["CSminus"])
@@ -253,8 +229,7 @@ class exp:
             self.trial(self.stim["CSplus"])
             self.trial(self.stim["CSminus"])
             
-        #group B order based on the e-prime
-        else:
+        else: #group B order based on the e-prime
             self.trial(self.stim["CSplus"], True)
             self.trial(self.stim["CSplus"])
             self.trial(self.stim["CSminus"])
@@ -285,6 +260,7 @@ class exp:
             self.trial(self.stim["CSplus"])
             self.trial(self.stim["CSplus"])
             self.trial(self.stim["CSminus"])
+            self.reversed=True
             self.trial(self.stim["CSminus"], True)
             self.trial(self.stim["CSplus"])
             self.trial(self.stim["CSminus"])
@@ -325,10 +301,9 @@ class exp:
             self.trial(self.stim["CSplus"])
             self.trial(self.stim["CSminus"])
 
-# %%
+# %% close date file, window and exit experiment
     def exp_end(self):
         
-        # close date file, window and exit experiment
         event.clearEvents()
         pl.getEYELINK().closeDataFile()
         transferFileName = self.edfFileName + '.edf' # fileName
@@ -338,9 +313,8 @@ class exp:
         sub.dataFile.close()
         self.win.close()
         core.quit()
-        
-        
-# %% truak sequence        
+              
+# %% trail sequence        
     def trial(self, color, US=False):
 
         '''
@@ -350,9 +324,8 @@ class exp:
         '''
         event.clearEvents()
         
-        fixTime = random.randint(1,2)
-        print(fixTime)
-        stimTime = 1-0.3*US 
+        fixTime = random.randint(10,15)
+        stimTime = 4-0.3*US 
         self.trial_n += 1
 
         self.rect.fillColor = color
@@ -364,52 +337,48 @@ class exp:
         clock = core.Clock()
         trialClock = clock.getLastResetTime() - self.globTime.getLastResetTime()
         
-        # error = pl.getEYELINK().startRecording(1,1,1,1) # flags = (samples in edf, events in edf, samples over link, events over link)
         pl.getEYELINK().sendMessage('TRIALID %d'%(self.trial_n))
         pl.getEYELINK().sendMessage(condition + str(US))
         
         # initate trial display
         fixStart = trialClock + clock.getTime()
         self.fixation.draw()
-        self.win.flip()
-        
-        while clock.getTime() < fixTime:
-            #continue
-            pl.getEYELINK().sendMessage('fixation')
-        
-
+        self.win.flip()     
+        pl.getEYELINK().sendMessage('fixation')
+        time.sleep(fixTime)
+                
         self.rect.draw()
         stimStart = trialClock + clock.getTime()
         self.lj.setFIOState(0,1)
-        self.win.flip()        
-                
-        while clock.getTime() < stimTime + fixTime:
-            #continue
-            pl.getEYELINK().sendMessage('stimuli')
-        
+        self.win.flip()       
+        pl.getEYELINK().sendMessage('stimuli')
+        time.sleep(stimTime)
+           
         # initate shock procedure if US = True
         usStart = trialClock + clock.getTime()
         if US:
-            self.lj.setFIOState(3,1)
-            
-            while clock.getTime() < stimTime + fixTime + 0.3:
-                pl.getEYELINK().sendMessage("shock")
-                #continue
-            self.lj.setFIOState(3,0)
-            
+            self.lj.setFIOState(6,1)
+            pl.getEYELINK().sendMessage("shock")
+            time.sleep(0.3)
+            self.lj.setFIOState(6,0)
             condition = condition+"US"   
-        self.lj.setFIOState(0,0)
+            self.lj.setFIOState(0,0)
         
         # write to file trial properties
-        sub.dataFile.write('{0},{1},{2},{3},{4},{5},{6},{7},{8},{9}\n'.format(sub.subjectID,self.group,sub.time_stamp,self.trial_n,condition,color,US,fixStart,stimStart,usStart))
+        sub.dataFile.write('{0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10}\n'.format(sub.subjectID,self.group,sub.time_stamp,self.trial_n,condition,color,US,fixStart,stimStart,usStart,self.reversed))
         
         
 # %% main budy of experiment   
+        
+def main():        
+    event.globalKeys.add(key='q',modifiers = ['ctrl'], func = core.quit)
+    sub = subject(int(input("subject number: ")))
+    ses = exp(sub)
+    ses.setup_eyelink()
+    ses.init_eyelink()
+    ses.seq_order()
+    ses.exp_end()
 
-event.globalKeys.add(key='q',modifiers = ['ctrl'], func = core.quit)
-sub = subject(102)
-ses = exp(sub)
-ses.setup_eyelink()
-ses.init_eyelink()
-ses.seq_order()
-ses.exp_end()
+
+if __name__ == '__main__':
+    main()
