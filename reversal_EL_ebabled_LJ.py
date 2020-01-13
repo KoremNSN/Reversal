@@ -33,11 +33,6 @@ class subject:
         #writes headers for the output file
         self.dataFile.write('Sub,Group,time,Trial_n,Condition,color,US,FixationOnset,StimulusOnset,USOnset,reversal\n')
 
-
-# %% create an experemental object input is a subject object
-class exp:
-    
-    def __init__(self, sub):
         # create a window object
         self.win = visual.Window(color=[0,0,0], screen = 1, fullscr=True, mouseVisible = False)
         #initiate a trial counter
@@ -50,16 +45,16 @@ class exp:
         # creates the visual objects for the experiment
         self.fixation=visual.Circle(self.win, radius=10, fillColor='black',lineColor='black',units = 'pix')
         self.rect = visual.Rect(self.win,units="norm",width=0.5,height=0.5,fillColor='black',lineColor='Grey',pos=(0,0))
-        self.Text = visual.TextStim(self.win,text="US", pos=(1,0), font='Courier New',
+        self.Text = visual.TextStim(self.win,text="US", pos=(0,0), font='Courier New',
             alignHoriz = 'center', alignVert = 'center', color = 'black',units = 'norm')
         
         # base on subject number subjects are divided to group A and B (%2) and color order (%4<=1)
-        if sub.subjectID % 2 == 0:
+        if self.subjectID % 2 == 0:
             self.group = "A"
         else:
             self.group = "B"
             
-        if sub.subjectID % 4 <= 1:
+        if self.subjectID % 4 <= 1:
             self.stim = {"CSplus":"blue","CSminus":"yellow"}
         else:
             self.stim={"CSplus":"yellow","CSminus":"blue"}
@@ -81,7 +76,7 @@ class exp:
         self.background = (127,127,127)
         
         # create file
-        self.edfFileName = "cbEL" + str(sub.subjectID)
+        self.edfFileName = "cbConfig" + str(self.subjectID)
         if len(self.edfFileName) > 8:
             self.edfFileName = self.edfFileName[0:8]
         pl.getEYELINK().openDataFile(self.edfFileName)
@@ -113,20 +108,29 @@ class exp:
         pl.closeGraphics()
         pl.setCalibrationSounds("", "", "");
         pl.setDriftCorrectSounds("", "off", "off");
+        
+        # close configuration file
+        pl.getEYELINK().closeDataFile()
+        transferFileName = self.edfFileName + '.edf' # fileName
+        pl.getEYELINK().receiveDataFile(self.edfFileName, transferFileName)
+
 # %%
-    def init_eyelink(self):
+    def resting_state(self, resttime):
+        
+        self.edfFileName = "cbRS" + str(self.subjectID)
+        if len(self.edfFileName) > 8:
+            self.edfFileName = self.edfFileName[0:8]
+        pl.getEYELINK().openDataFile(self.edfFileName)
+        pl.getEYELINK().setOfflineMode()
         
         event.clearEvents()
-        self.Text.text = 'Experiment start'
+        self.Text.text = 'Please Relax'
         self.Text.draw()
-        pl.getEYELINK().sendMessage('WaitForExptrStart')
+        pl.getEYELINK().sendMessage('WaitForRestingState')
         self.win.flip()
         
         pl.getEYELINK().sendMessage('WaitForExptrStart press 7')
-        while True:
-            buttonPress=event.getKeys(keyList = ['7'])
-            if buttonPress==['7']:
-                break
+        event.waitKeys(keyList = ['7'])
         
         event.clearEvents()
         self.Text.text = 'Waiting for the scanner to start...'
@@ -135,10 +139,49 @@ class exp:
         self.win.flip()
         
         pl.getEYELINK().sendMessage('WaitForScanner')
-        while True:
-            buttonPress=event.getKeys(keyList = ['5'])
-            if buttonPress == ['5']:
-                break
+        event.waitKeys(keyList = ['5'])
+                
+        # get a start point  
+        self.Text.text = ""
+        self.Text.draw()
+        self.win.flip()
+        pl.getEYELINK().sendMessage('resting')
+        time.sleep(resttime)
+        
+        # close and transfer file
+        pl.getEYELINK().closeDataFile()
+        transferFileName = self.edfFileName + '.edf' # fileName
+        pl.getEYELINK().receiveDataFile(self.edfFileName, transferFileName)            
+            
+
+# %%
+    def init_experiment(self):
+        
+        # create file
+        self.edfFileName = "cbEL" + str(self.subjectID)
+        if len(self.edfFileName) > 8:
+            self.edfFileName = self.edfFileName[0:8]
+        pl.getEYELINK().openDataFile(self.edfFileName)
+        pl.getEYELINK().setOfflineMode()
+        
+        event.clearEvents()
+        self.Text.text = 'Experiment start'
+        self.Text.draw()
+        pl.getEYELINK().sendMessage('WaitForExptrStart')
+        self.win.flip()
+        
+        pl.getEYELINK().sendMessage('WaitForExptrStart press 7')
+        event.waitKeys(keyList = ['7'])
+        
+        event.clearEvents()
+        self.Text.text = 'Waiting for the scanner to start...'
+        self.Text.draw()
+        pl.getEYELINK().sendMessage('WaitForExptrStart')
+        self.win.flip()
+        
+        pl.getEYELINK().sendMessage('WaitForScanner')
+        event.waitKeys(keyList = ['5'])
+        
         #get a start point  
         self.globTime = core.Clock()
         self.Text.text = "Ready"
@@ -189,6 +232,7 @@ class exp:
             self.trial(self.stim["CSplus"])
             self.trial(self.stim["CSminus"])
             self.reversed=True
+            pl.getEYELINK().sendMessage('Reversed')
             self.trial(self.stim["CSminus"], True)
             self.trial(self.stim["CSplus"])
             self.trial(self.stim["CSminus"])
@@ -261,6 +305,7 @@ class exp:
             self.trial(self.stim["CSplus"])
             self.trial(self.stim["CSminus"])
             self.reversed=True
+            pl.getEYELINK().sendMessage('Reversed')
             self.trial(self.stim["CSminus"], True)
             self.trial(self.stim["CSplus"])
             self.trial(self.stim["CSminus"])
@@ -310,7 +355,7 @@ class exp:
         pl.getEYELINK().receiveDataFile(self.edfFileName, transferFileName)
         pl.getEYELINK().close()
         self.lj.close()
-        sub.dataFile.close()
+        self.dataFile.close()
         self.win.close()
         core.quit()
               
@@ -323,7 +368,7 @@ class exp:
                 boolian - US - True for shock
         '''
         event.clearEvents()
-        
+        pl.getEYELINK().startRecording(1,1,1,1)
         fixTime = random.randint(10,15)
         stimTime = 4-0.3*US 
         self.trial_n += 1
@@ -343,41 +388,45 @@ class exp:
         # initate trial display
         fixStart = trialClock + clock.getTime()
         self.fixation.draw()
-        self.win.flip()     
         pl.getEYELINK().sendMessage('fixation')
+        self.win.flip()
         time.sleep(fixTime)
-                
+        
         self.rect.draw()
         stimStart = trialClock + clock.getTime()
         self.lj.setFIOState(0,1)
-        self.win.flip()       
         pl.getEYELINK().sendMessage('stimuli')
+        self.win.flip()       
         time.sleep(stimTime)
-           
+                 
         # initate shock procedure if US = True
         usStart = trialClock + clock.getTime()
         if US:
-            self.lj.setFIOState(6,1)
             pl.getEYELINK().sendMessage("shock")
+            for i in range(3,7):
+                self.lj.setFIOState(i,1)
+            for i in range(3,7):
+                self.lj.setFIOState(i,0)
+            for i in range(3,7):
+                self.lj.setFIOState(i,1)
             time.sleep(0.3)
-            self.lj.setFIOState(6,0)
             condition = condition+"US"   
-            self.lj.setFIOState(0,0)
-        
+        self.lj.setFIOState(0,0)
+        pl.getEYELINK().sendMessage('Trial end')
         # write to file trial properties
-        sub.dataFile.write('{0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10}\n'.format(sub.subjectID,self.group,sub.time_stamp,self.trial_n,condition,color,US,fixStart,stimStart,usStart,self.reversed))
+        self.dataFile.write('{0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10}\n'.format(self.subjectID,self.group,self.time_stamp,self.trial_n,condition,color,US,fixStart,stimStart,usStart,self.reversed))
         
         
 # %% main budy of experiment   
         
 def main():        
     event.globalKeys.add(key='q',modifiers = ['ctrl'], func = core.quit)
-    sub = subject(int(input("subject number: ")))
-    ses = exp(sub)
-    ses.setup_eyelink()
-    ses.init_eyelink()
-    ses.seq_order()
-    ses.exp_end()
+    sub = subject(1403)
+    sub.setup_eyelink()
+    sub.resting_state(6000)
+    sub.init_experiment()
+    sub.seq_order()
+    sub.exp_end()
 
 
 if __name__ == '__main__':
