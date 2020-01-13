@@ -12,7 +12,16 @@ while True:
     Text.draw()
     win.flip()
     time.sleep(1)
-    lj.setFIOState(6,0)
+    for i in range(3,7):
+        print(i)
+        lj.setFIOState(i,1)
+    for i in range(3,7):
+        lj.setFIOState(i,0)
+        print(i)   
+    for i in range(3,7):
+        lj.setFIOState(i,1)
+        print(i)
+     
     Text.text = 'did you fill it?'
     Text.draw()
     win.flip()
