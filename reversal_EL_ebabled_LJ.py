@@ -151,8 +151,7 @@ class subject:
         # close and transfer file
         pl.getEYELINK().closeDataFile()
         transferFileName = self.edfFileName + '.edf' # fileName
-        pl.getEYELINK().receiveDataFile(self.edfFileName, transferFileName)            
-            
+        pl.getEYELINK().receiveDataFile(self.edfFileName, transferFileName)                     
 
 # %%
     def init_experiment(self):
