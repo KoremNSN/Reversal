@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+553# -*- coding: utf-8 -*-
 """
 Spyder Editor
 
@@ -63,6 +63,7 @@ class subject:
  # %% initaite the eyelink module and run calibration
        
     def setup_eyelink(self):
+        
         '''Thank you very much
         
         '''
@@ -110,26 +111,28 @@ class subject:
         pl.setDriftCorrectSounds("", "off", "off");
         
         # close configuration file
+        event.clearEvents()
         pl.getEYELINK().closeDataFile()
         transferFileName = self.edfFileName + '.edf' # fileName
         pl.getEYELINK().receiveDataFile(self.edfFileName, transferFileName)
 
 # %%
-    def resting_state(self, resttime):
+    def two_min(self):
         
-        self.edfFileName = "cbRS" + str(self.subjectID)
+        
+        self.edfFileName = "cb2M" + str(self.subjectID)
         if len(self.edfFileName) > 8:
             self.edfFileName = self.edfFileName[0:8]
         pl.getEYELINK().openDataFile(self.edfFileName)
         pl.getEYELINK().setOfflineMode()
         
         event.clearEvents()
-        self.Text.text = 'Please Relax'
+        self.Text.text = 'Please Relax "7" to continue'
         self.Text.draw()
         pl.getEYELINK().sendMessage('WaitForRestingState')
         self.win.flip()
         
-        pl.getEYELINK().sendMessage('WaitForExptrStart press 7')
+        pl.getEYELINK().sendMessage('WaitForExptrStart')
         event.waitKeys(keyList = ['7'])
         
         event.clearEvents()
@@ -142,6 +145,76 @@ class subject:
         event.waitKeys(keyList = ['5'])
                 
         # get a start point  
+        pl.getEYELINK().startRecording(1,1,1,1)
+        self.Text.text = ""
+        self.Text.draw()
+        self.win.flip()
+        pl.getEYELINK().sendMessage('resting')
+        time.sleep(120)
+        
+        # close and transfer file
+        pl.getEYELINK().closeDataFile()
+        transferFileName = self.edfFileName + '.edf' # fileName
+        pl.getEYELINK().receiveDataFile(self.edfFileName, transferFileName) 
+        
+# %%
+    def shock_calibration(self):
+        
+        self.Text.text = 'shock intensity calibration'
+        self.Text.draw()
+        self.win.flip()
+        event.waitKeys()
+        
+        
+        while True:
+            self.lj.setFIOState(6,1)
+            self.Text.text = 'get ready'
+            self.Text.draw()
+            self.win.flip()
+            time.sleep(1)
+            for i in range(3,7):
+                self.lj.setFIOState(i,1)
+            for i in range(3,7):
+                self.lj.setFIOState(i,0)
+            for i in range(3,7):
+                self.lj.setFIOState(i,1)
+             
+            self.Text.text = 'did you feel it? "5" to accept'
+            self.Text.draw()
+            self.win.flip()
+            buttonPress=event.waitKeys()
+                 
+            if buttonPress == ['5']:
+                break
+# %%
+    def resting_state(self, resttime):
+        
+        self.edfFileName = "cbRS" + str(self.subjectID)
+        if len(self.edfFileName) > 8:
+            self.edfFileName = self.edfFileName[0:8]
+        pl.getEYELINK().openDataFile(self.edfFileName)
+        pl.getEYELINK().setOfflineMode()
+        
+        event.clearEvents()
+        self.Text.text = 'Please Relax "7" to continue'
+        self.Text.draw()
+        pl.getEYELINK().sendMessage('WaitForRestingState')
+        self.win.flip()
+        
+        pl.getEYELINK().sendMessage('WaitForExptrStart')
+        event.waitKeys(keyList = ['7'])
+        
+        event.clearEvents()
+        self.Text.text = 'Waiting for the scanner to start...'
+        self.Text.draw()
+        pl.getEYELINK().sendMessage('WaitForExptrStart')
+        self.win.flip()
+        
+        pl.getEYELINK().sendMessage('WaitForScanner')
+        event.waitKeys(keyList = ['5'])
+                
+        # get a start point  
+        pl.getEYELINK().startRecording(1,1,1,1)
         self.Text.text = ""
         self.Text.draw()
         self.win.flip()
@@ -151,7 +224,8 @@ class subject:
         # close and transfer file
         pl.getEYELINK().closeDataFile()
         transferFileName = self.edfFileName + '.edf' # fileName
-        pl.getEYELINK().receiveDataFile(self.edfFileName, transferFileName)                     
+        pl.getEYELINK().receiveDataFile(self.edfFileName, transferFileName)            
+            
 
 # %%
     def init_experiment(self):
@@ -420,12 +494,15 @@ class subject:
         
 def main():        
     event.globalKeys.add(key='q',modifiers = ['ctrl'], func = core.quit)
-    sub = subject(1403)
+    sub = subject(1575)
     sub.setup_eyelink()
-    sub.resting_state(6000)
+    sub.shock_calibration()
+    sub.two_min()
     sub.init_experiment()
     sub.seq_order()
+    sub.resting_state(480)
     sub.exp_end()
+    
 
 
 if __name__ == '__main__':
